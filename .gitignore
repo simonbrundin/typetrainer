@@ -1,0 +1,16 @@
+# Binaries
+src/go/typetrainer
+src/go/cli
+src/go/*.exe
+
+# Go
+src/go/vendor/
+src/go/pkg/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
