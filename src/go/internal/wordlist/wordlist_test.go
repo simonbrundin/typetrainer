@@ -183,3 +183,156 @@ func TestGlobal(t *testing.T) {
 		t.Error("Global() should return the same instance")
 	}
 }
+
+func TestWordList_NoDuplicateWords(t *testing.T) {
+	wl := New()
+
+	seen := make(map[string]bool)
+	for _, w := range wl.words {
+		if seen[w.Text] {
+			t.Errorf("word list contains duplicate word %q", w.Text)
+		}
+		seen[w.Text] = true
+	}
+}
+
+func TestWordList_RandomWords_Distinct(t *testing.T) {
+	wl := New()
+
+	words := wl.RandomWords(30)
+
+	seen := make(map[string]bool)
+	for _, w := range words {
+		if seen[w.Text] {
+			t.Errorf("RandomWords returned duplicate word %q", w.Text)
+		}
+		seen[w.Text] = true
+	}
+}
+
+func TestComputeFamilies_Inflections(t *testing.T) {
+	words := []Word{
+		{Text: "prata"}, {Text: "pratar"}, {Text: "pratade"}, {Text: "pratat"},
+		{Text: "hus"}, {Text: "huset"},
+	}
+
+	families := computeFamilies(words)
+
+	same := func(a, b int) bool { return families[a] == families[b] }
+	if !same(0, 1) || !same(0, 2) || !same(0, 3) {
+		t.Error("inflections of \"prata\" should belong to the same family")
+	}
+	if same(0, 4) {
+		t.Error("\"prata\" and \"hus\" should not belong to the same family")
+	}
+	if !same(4, 5) {
+		t.Error("\"hus\" and \"huset\" should belong to the same family")
+	}
+}
+
+func TestWordList_AdaptiveSelection_LimitsInflectionFamily(t *testing.T) {
+	wl := New()
+
+	// "ra", "ta" och "at" är svaga bigram i många ord som prata/pratar/pratade
+	words := wl.AdaptiveSelection([]string{"ra", "ta", "at"}, 20)
+
+	if len(words) != 20 {
+		t.Fatalf("AdaptiveSelection returned %d words, want 20", len(words))
+	}
+
+	familyCount := make(map[int]int)
+	for _, w := range words {
+		fam := wl.familyOf(w.index)
+		familyCount[fam]++
+		if familyCount[fam] > maxPerFamily {
+			t.Errorf("family of %q appears %d times, want at most %d", w.Text, familyCount[fam], maxPerFamily)
+		}
+	}
+}
+
+func TestWordList_AdaptiveSelection_NoInflectionCluster(t *testing.T) {
+	wl := New()
+
+	words := wl.AdaptiveSelection([]string{"ra", "ta", "at", "pr"}, 20)
+
+	// Räkna hur många ord som tillhör "prata"-familjen
+	prataWords := 0
+	for _, w := range words {
+		for _, fam := range wl.words {
+			if fam.Text == "prata" && wl.familyOf(fam.index) == wl.familyOf(w.index) {
+				prataWords++
+				break
+			}
+		}
+	}
+
+	if prataWords > maxPerFamily {
+		t.Errorf("session contains %d words from the \"prata\" family, want at most %d", prataWords, maxPerFamily)
+	}
+}
+
+func TestWordList_PracticeWords_FamilyCap(t *testing.T) {
+	wl := New()
+
+	words := wl.PracticeWords("pr", 1)
+
+	familyCount := make(map[int]int)
+	for _, w := range words {
+		familyCount[wl.familyOf(w.index)]++
+	}
+	for w, n := range familyCount {
+		if n > 1 {
+			t.Errorf("family appears %d times in practice words", n)
+		}
+		_ = w
+	}
+
+	// Alla ord ska fortfarande innehålla bigramet
+	for _, w := range words {
+		found := false
+		runes := []rune(w.Text)
+		for i := 0; i < len(runes)-1; i++ {
+			if string(runes[i])+string(runes[i+1]) == "pr" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("word %q does not contain bigram 'pr'", w.Text)
+		}
+	}
+}
+
+func TestWordList_AdaptiveSelection_LimitsWordEndings(t *testing.T) {
+	wl := New()
+
+	words := wl.AdaptiveSelection([]string{"ra", "ta", "at", "pr"}, 20)
+
+	endingCount := make(map[string]int)
+	for _, w := range words {
+		endingCount[endingOf(w.Text)]++
+	}
+	for ending, n := range endingCount {
+		if n > maxPerEnding {
+			t.Errorf("ending %q appears %d times, want at most %d", ending, n, maxPerEnding)
+		}
+	}
+}
+
+func TestEndingOf(t *testing.T) {
+	tests := []struct {
+		word string
+		want string
+	}{
+		{"prata", "ta"},
+		{"pratat", "at"},
+		{"hej", "ej"},
+		{"a", "a"},
+	}
+
+	for _, tt := range tests {
+		if got := endingOf(tt.word); got != tt.want {
+			t.Errorf("endingOf(%q) = %q, want %q", tt.word, got, tt.want)
+		}
+	}
+}
