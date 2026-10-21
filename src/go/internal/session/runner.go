@@ -2,7 +2,6 @@ package session
 
 import (
 	"fmt"
-	"time"
 
 	"typetrainer/internal/stats"
 	"typetrainer/internal/wordlist"
@@ -69,15 +68,15 @@ func createModel(
 	mode Mode,
 ) *Model {
 	return &Model{
-		session:      session,
-		config:       &cfg,
-		mode:         mode,
-		wordlist:     wl,
-		words:        words,
-		showIntro:    false, // Start directly without intro
-		introDone:    true,  // Mark intro as done for stats
-		timeLeft:     cfg.SprintDuration,
-		allStats:     s,
+		session:   session,
+		config:    &cfg,
+		mode:      mode,
+		wordlist:  wl,
+		words:     words,
+		showIntro: false, // Start directly without intro
+		introDone: true,  // Mark intro as done for stats
+		timeLeft:  cfg.SprintDuration,
+		allStats:  s,
 	}
 }
 
@@ -115,14 +114,7 @@ func shouldSaveResults(model *Model) bool {
 }
 
 func createSessionSummary(session *Session) stats.SessionSummary {
-	return stats.SessionSummary{
-		Date:           time.Now(),
-		WordsCompleted: session.Buffer.Cursor / 5, // Approximate words
-		Errors:         session.TotalErrors,
-		WPM:            session.WPM(),
-		RawWPM:         session.RawWPM(),
-		DurationMs:     time.Since(session.StartedAt).Milliseconds(),
-	}
+	return session.Result()
 }
 
 func mergeBigramStats(session *Session, s *stats.Stats) {

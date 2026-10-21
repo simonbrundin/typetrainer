@@ -19,18 +19,23 @@ type SessionSummary struct {
 	WPM            float64   `json:"wpm"`
 	RawWPM         float64   `json:"raw_wpm"`
 	DurationMs     int64     `json:"duration_ms"`
+	CharsTyped     int       `json:"chars_typed"`
 }
 
 // Accuracy calculates accuracy percentage
 func (s *SessionSummary) Accuracy() float64 {
-	if s.WordsCompleted == 0 {
+	chars := s.CharsTyped
+	if chars == 0 {
+		// Äldre sessioner har inte teckenantal, approximera då med 5 tecken/ord
+		chars = s.WordsCompleted * 5
+	}
+	if chars == 0 {
 		return 100
 	}
-	approxChars := s.WordsCompleted * 5
-	if approxChars == 0 {
-		return 100
+	if s.Errors > chars {
+		return 0
 	}
-	return float64(approxChars-s.Errors) / float64(approxChars) * 100
+	return float64(chars-s.Errors) / float64(chars) * 100
 }
 
 // Score returns WPM * accuracy / 100 for a session

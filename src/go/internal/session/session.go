@@ -131,31 +131,85 @@ type Session struct {
 	StartedAt         time.Time
 	WordStartTime     time.Time
 	TotalErrors       int
-	CorrectChars      int  // Total correct characters typed (doesn't decrease on restart)
 	Bigrams           *bigram.Database
-	SequenceStartPos  int  // Buffer position where current correct sequence started
-	WordStartPos      int  // Buffer position where current word starts
-	HasSequenceErrors bool // True if current sequence has any wrong keystrokes
+	SequenceStartPos  int                  // Buffer position where current correct sequence started
+	WordStartPos      int                  // Buffer position where current word starts
+	HasSequenceErrors bool                 // True if current sequence has any wrong keystrokes
+	AttemptStart      int                  // Index i Keystrokes där nuvarande ordförsök började
+	CompletedAt       time.Time            // När sista tecknet skrevs
+	Summary           stats.SessionSummary // Fryst resultat för sessionen
 }
 
-// WPM calculates words per minute (correct characters only)
+// WPM calculates words per minute (korrekta tecken)
 func (s *Session) WPM() float64 {
-	elapsed := time.Since(s.StartedAt).Seconds()
-	if elapsed == 0 {
-		return 0
-	}
-	// Use CorrectChars instead of Buffer.Cursor (which decreases on restart)
-	return float64(s.CorrectChars) / 5.0 * 60.0 / elapsed
+	return s.wordsPerMinute(float64(s.CorrectChars()), time.Since(s.StartedAt).Seconds())
 }
 
-// RawWPM calculates raw words per minute (all keystrokes)
+// RawWPM calculates raw words per minute (alla tangenttryck)
 func (s *Session) RawWPM() float64 {
-	elapsed := time.Since(s.StartedAt).Seconds()
-	if elapsed == 0 {
+	return s.wordsPerMinute(float64(len(s.Keystrokes)), time.Since(s.StartedAt).Seconds())
+}
+
+// CorrectChars returns the number of characters typed correctly in the text.
+// Efter en omstart räknas omstartade tecken inte igen (netto).
+func (s *Session) CorrectChars() int {
+	return s.Buffer.Cursor
+}
+
+// wordsPerMinute converts a number of characters to words per minute
+func (s *Session) wordsPerMinute(chars, seconds float64) float64 {
+	if seconds <= 0 {
 		return 0
 	}
-	// Monkeytype: (all_chars / 5) * (60 / elapsed_seconds)
-	return float64(len(s.Keystrokes)) / 5.0 * 60.0 / elapsed
+	return chars / 5.0 * 60.0 / seconds
+}
+
+// WordsCompleted returns how many words that have been typed
+func (s *Session) WordsCompleted() int {
+	n := s.Buffer.Cursor
+	if n <= 0 {
+		return 0
+	}
+	if n > len(s.Buffer.Runes) {
+		n = len(s.Buffer.Runes)
+	}
+
+	words := 1 // sista ordet räknas även om det inte följs av mellanslag
+	for i := 0; i < n; i++ {
+		if s.Buffer.Runes[i] == ' ' {
+			words++
+		}
+	}
+	return words
+}
+
+// Freeze beräknar sessionens resultat och fryser det, så att värdet inte
+// ändras medan användaren tittar på sammanfattningen.
+func (s *Session) Freeze() {
+	end := s.CompletedAt
+	if end.IsZero() {
+		end = time.Now()
+	}
+	duration := end.Sub(s.StartedAt)
+	seconds := duration.Seconds()
+
+	s.Summary = stats.SessionSummary{
+		Date:           s.StartedAt,
+		WordsCompleted: s.WordsCompleted(),
+		Errors:         s.TotalErrors,
+		WPM:            s.wordsPerMinute(float64(s.CorrectChars()), seconds),
+		RawWPM:         s.wordsPerMinute(float64(len(s.Keystrokes)), seconds),
+		DurationMs:     duration.Milliseconds(),
+		CharsTyped:     s.CorrectChars(),
+	}
+}
+
+// Result returns the session result, freezing it first if needed
+func (s *Session) Result() stats.SessionSummary {
+	if s.Summary.Date.IsZero() {
+		s.Freeze()
+	}
+	return s.Summary
 }
 
 // Accuracy calculates overall accuracy

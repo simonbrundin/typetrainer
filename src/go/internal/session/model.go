@@ -43,7 +43,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *time.Timer:
 		m.timeLeft--
 		if m.timeLeft <= 0 {
-			m.showContinue = true
+			m.completeSession()
 			return m, tea.Quit
 		}
 	}
@@ -115,10 +115,11 @@ func (m *Model) handleContinuePrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// restartSequence resets the cursor to the start of the current word
+// restartSequence resets the cursor to the start of the current word.
+// Tangenttrycken behalls så att felen räknas med i accuracy och raw WPM.
 func (m *Model) restartSequence() {
 	m.session.Buffer.Cursor = m.session.WordStartPos
-	m.session.Keystrokes = nil
+	m.session.AttemptStart = len(m.session.Keystrokes)
 	m.session.HasSequenceErrors = false
 	m.session.WordStartTime = time.Now()
 }
@@ -135,10 +136,7 @@ func (m *Model) handleTypingInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Check if complete
 	if buf.IsComplete() {
-		m.showContinue = true
-		if m.timer != nil {
-			m.timer.Stop()
-		}
+		m.completeSession()
 		return m, nil
 	}
 
@@ -169,7 +167,6 @@ func (m *Model) handleTypingInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if correct {
 		m.recordBigramProgress(prev, expected, timeMs)
 		buf.Cursor++
-		m.session.CorrectChars++ // Track total correct chars (doesn't decrease on restart)
 		m.session.WordStartTime = time.Now()
 
 		// Update WordStartPos when entering a new word (after space)
@@ -179,10 +176,7 @@ func (m *Model) handleTypingInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		if buf.IsComplete() {
-			m.showContinue = true
-			if m.timer != nil {
-				m.timer.Stop()
-			}
+			m.completeSession()
 		}
 	}
 
@@ -191,10 +185,21 @@ func (m *Model) handleTypingInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // getPreviousRune returns the previous expected rune for bigram tracking
 func (m *Model) getPreviousRune() rune {
-	if len(m.session.Keystrokes) == 0 {
+	// Endast tecken från det pågående ordförsöket räknas
+	if len(m.session.Keystrokes) <= m.session.AttemptStart {
 		return 0
 	}
 	return m.session.Keystrokes[len(m.session.Keystrokes)-1].Expected
+}
+
+// completeSession freezes the session result and shows the summary
+func (m *Model) completeSession() {
+	m.showContinue = true
+	m.session.CompletedAt = time.Now()
+	m.session.Freeze()
+	if m.timer != nil {
+		m.timer.Stop()
+	}
 }
 
 // recordBigramProgress records bigram statistics for correct keystroke
