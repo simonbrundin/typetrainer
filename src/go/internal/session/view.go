@@ -17,26 +17,66 @@ const ProgressBarWidth = 40
 
 // Styles
 var (
-	correctStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	currentStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
+	correctStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	// Text styles
+	currentStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Bold(true).Reverse(true)
+	typedStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	remainingStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
 	dimStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	typedStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	progressStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
 	borderStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+	warningStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 )
+
+// boxWidth är den inre bredden på textrutorna
+const boxWidth = 44
+
+// renderBox ritar en ram runt rubrik och innehåll
+func renderBox(title string, rows []string) string {
+	var b strings.Builder
+
+	b.WriteString(borderStyle.Render("+"+strings.Repeat("-", boxWidth)+"+") + "\n")
+	b.WriteString(borderStyle.Render("|") + centerText(title, boxWidth) + borderStyle.Render("|") + "\n")
+	b.WriteString(borderStyle.Render("+"+strings.Repeat("-", boxWidth)+"+") + "\n")
+
+	for _, row := range rows {
+		b.WriteString(borderStyle.Render("|") + padText(row, boxWidth) + borderStyle.Render("|") + "\n")
+	}
+
+	b.WriteString(borderStyle.Render("+"+strings.Repeat("-", boxWidth)+"+") + "\n")
+	return b.String()
+}
+
+// centerText centrerar text i en given bredd
+func centerText(text string, width int) string {
+	runes := []rune(text)
+	if len(runes) >= width {
+		return string(runes[:width])
+	}
+	left := (width - len(runes)) / 2
+	right := width - len(runes) - left
+	return strings.Repeat(" ", left) + text + strings.Repeat(" ", right)
+}
+
+// padText vänsterjusterar text i en given bredd
+func padText(text string, width int) string {
+	runes := []rune(text)
+	if len(runes) >= width {
+		return string(runes[:width])
+	}
+	return text + strings.Repeat(" ", width-len(runes))
+}
 
 // introView renders the intro screen
 func (m *Model) introView() string {
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString(borderStyle.Render("╔══════════════════════════════════════════╗\n"))
-	b.WriteString(fmt.Sprintf("║          TYPE TRAINER - %-18s║\n", m.mode.String()))
-	b.WriteString(borderStyle.Render("╠══════════════════════════════════════════╣\n"))
-	b.WriteString("║  Skriv orden som visas.                 ║\n")
-	b.WriteString("║  Tryck Ctrl+C för att avsluta.          ║\n")
-	b.WriteString(borderStyle.Render("╚══════════════════════════════════════════╝\n"))
-	b.WriteString("\n  Tryck Enter för att börja...")
+	b.WriteString(renderBox("TYPE TRAINER - "+m.mode.String(), []string{
+		"  Skriv orden som visas.",
+		"  Tryck Ctrl+C för att avsluta.",
+	}))
+	b.WriteString("\n  Tryck Enter for att börja...")
 	return b.String()
 }
 
@@ -49,49 +89,65 @@ func (m *Model) sessionView() string {
 	text := buf.Text
 	cursor := buf.Cursor
 
-	b.WriteString("\n\n")
+	b.WriteString("\n\n\n") // Extra space above
 
 	// Convert to runes for proper Unicode handling
 	runes := []rune(text)
 	totalLen := len(runes)
 
 	// Display settings
-	const leftPadding = 3  // Spaces before the text starts
-	const historyLen = 10  // How many typed chars to show (grayed out)
+	const leftPadding = 5
+	const historyLen = 8
+	const charSpacing = 0 // No extra spaces between characters
 
 	// Calculate visible range
-	// Show some history to the left (grayed out), then current and remaining
 	startRune := cursor - historyLen
 	if startRune < 0 {
 		startRune = 0
 	}
+
+	// NEVER show leading spaces
+	for startRune < cursor && startRune < totalLen {
+		if runes[startRune] != ' ' {
+			break
+		}
+		startRune++
+	}
+	if startRune >= cursor {
+		startRune = cursor - 1
+		if startRune < 0 {
+			startRune = 0
+		}
+	}
+
 	endRune := cursor + DisplayLength - historyLen
 	if endRune > totalLen {
 		endRune = totalLen
 	}
 
 	// Left padding
-	b.WriteString("  ")
-	for i := 0; i < leftPadding; i++ {
-		b.WriteString(" ")
-	}
+	b.WriteString(strings.Repeat(" ", leftPadding))
 
-	// Show text with highlighting
+	// Show text with spacing between characters
 	for i := startRune; i < endRune; i++ {
 		r := runes[i]
 		runeStr := string(r)
 
 		if i < cursor {
-			// Already typed - grayed out (but visible)
+			// Already typed - mörkgrå
 			b.WriteString(typedStyle.Render(runeStr))
 		} else if i == cursor {
-			// Current position - bright/bold
+			// Current position - gul, fet, reverse
 			b.WriteString(currentStyle.Render(runeStr))
 		} else {
-			// Remaining - dim
-			b.WriteString(dimStyle.Render(runeStr))
+			// Remaining - vit, fet
+			b.WriteString(remainingStyle.Render(runeStr))
 		}
+		// Add spacing after each character
+		b.WriteString(strings.Repeat(" ", charSpacing))
 	}
+
+	b.WriteString("\n\n")
 
 	// Pad with spaces to fill display
 	displayedLen := endRune - startRune + leftPadding
@@ -123,7 +179,7 @@ func (m *Model) sessionView() string {
 
 	// Show hint if sequence has errors
 	if s.HasSequenceErrors {
-		b.WriteString(dimStyle.Render("  │  Tab/Ctrl+Backspace = starta om"))
+		b.WriteString(warningStyle.Render("  Tab/Ctrl+Backspace = starta om"))
 	}
 
 	return b.String()
@@ -132,28 +188,26 @@ func (m *Model) sessionView() string {
 // summaryView renders the session summary
 func (m *Model) summaryView() string {
 	s := m.session
-	wpm := s.WPM()
-	rawWpm := s.RawWPM()
+	result := s.Result()
+	wpm := result.WPM
+	rawWpm := result.RawWPM
 	accuracy := s.Accuracy()
-	charsTyped := s.Buffer.Cursor
+	charsTyped := s.CorrectChars()
 
 	msg := getPerformanceMessage(wpm, accuracy)
 
 	var b strings.Builder
 	b.WriteString("\n")
-	b.WriteString(borderStyle.Render("╔══════════════════════════════════════════╗\n"))
-	b.WriteString(borderStyle.Render("║            SESSION COMPLETE!             ║\n"))
-	b.WriteString(borderStyle.Render("╠══════════════════════════════════════════╣\n"))
-	b.WriteString(fmt.Sprintf("║                                          ║\n"))
-	b.WriteString(fmt.Sprintf("║   Tecken skrivna:     %12d        ║\n", charsTyped))
-	b.WriteString(fmt.Sprintf("║   Totalt fel:          %12d        ║\n", s.TotalErrors))
-	b.WriteString(fmt.Sprintf("║   Raw WPM:             %12.1f        ║\n", rawWpm))
-	b.WriteString(fmt.Sprintf("║   WPM (korrekt):       %12.1f        ║\n", wpm))
-	b.WriteString(fmt.Sprintf("║   Accuracy:            %12.1f%%        ║\n", accuracy))
-	b.WriteString(fmt.Sprintf("║                                          ║\n"))
-	b.WriteString(fmt.Sprintf("║   %s                         ║\n", msg))
-	b.WriteString(fmt.Sprintf("║                                          ║\n"))
-	b.WriteString(borderStyle.Render("╚══════════════════════════════════════════╝\n"))
+	b.WriteString(renderBox("SESSION COMPLETE!", []string{
+		fmt.Sprintf("  Tecken skrivna:  %10d", charsTyped),
+		fmt.Sprintf("  Ord:             %10d", result.WordsCompleted),
+		fmt.Sprintf("  Totalt fel:      %10d", s.TotalErrors),
+		fmt.Sprintf("  Raw WPM:         %10.1f", rawWpm),
+		fmt.Sprintf("  WPM (korrekt):   %10.1f", wpm),
+		fmt.Sprintf("  Accuracy:        %10.1f%%", accuracy),
+		"",
+		fmt.Sprintf("  %s", msg),
+	}))
 
 	// Add progress graph if we have stats
 	if m.allStats != nil {
@@ -165,9 +219,9 @@ func (m *Model) summaryView() string {
 	}
 
 	if m.showContinue {
-		b.WriteString(dimStyle.Render("  Enter = kör igen   |   Esc = avsluta"))
+		b.WriteString(dimStyle.Render("  Enter = kor igen   |   Esc = avsluta"))
 	} else {
-		b.WriteString("\n  Tryck Enter för att avsluta...")
+		b.WriteString("\n  Tryck Enter for att avsluta...")
 	}
 
 	return b.String()
@@ -190,11 +244,11 @@ func (m *Model) renderSessionGraph(currentWPM float64) string {
 func getPerformanceMessage(wpm, accuracy float64) string {
 	switch {
 	case wpm >= 80 && accuracy >= 98:
-		return "Fantastisk! Du är snabb och exakt! 🎉"
+		return "Fantastisk! Snabb och exakt!"
 	case wpm >= 80:
 		return "Blixtrande snabbt! Jobba på noggrannheten."
 	case accuracy >= 98:
-		return "Noggrann som en schweizisk klocka! 💯"
+		return "Noggrann som en schweizisk klocka!"
 	case wpm >= 60 && accuracy >= 95:
 		return "Riktigt bra! Håll det uppe!"
 	case wpm >= 60:
@@ -202,7 +256,7 @@ func getPerformanceMessage(wpm, accuracy float64) string {
 	case accuracy >= 95:
 		return "Fin precision! Försök öka farten."
 	case wpm >= 40 && accuracy >= 90:
-		return "Godkänt! Börja växla upp."
+		return "Godkant! Börja vaxla upp."
 	case wpm < 30:
 		return "Lugn och fin, du lär dig!"
 	default:

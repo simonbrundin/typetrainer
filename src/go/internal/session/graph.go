@@ -18,32 +18,42 @@ const (
 // renderGraph draws an ASCII graph of session WPM values
 func renderGraph(sessions []stats.SessionSummary) string {
 	numPoints := len(sessions)
-	if numPoints > 30 {
-		numPoints = 30
+	if numPoints > graphWidth {
+		numPoints = graphWidth
+	}
+	if numPoints < 1 {
+		return ""
 	}
 	startIdx := len(sessions) - numPoints
 
 	// Extract WPM values
 	wpmValues := extractWPMValues(sessions, startIdx, numPoints)
 	avgWPM := calculateAverage(wpmValues)
-
-	// Calculate min/max for scaling
 	minWPM, maxWPM := findMinMax(wpmValues)
 	minWPM, maxWPM = addPadding(minWPM, maxWPM)
+
+	// Placera punkterna i rutnätet och rita linjen
+	rows := positionPoints(wpmValues, minWPM, maxWPM)
+	grid := drawGrid(rows)
 
 	var b strings.Builder
 
 	// Header
-	b.WriteString(fmt.Sprintf("  WPM-utveckling (senaste 30) - Snitt: %.1f\n\n", avgWPM))
+	b.WriteString(fmt.Sprintf("  WPM-utveckling (senaste %d) - Snitt: %.1f\n\n", numPoints, avgWPM))
 
-	// Draw grid
-	drawGrid(&b, minWPM, maxWPM)
+	// Rita rader med etikett (överst = högst värde)
+	for i := 0; i <= graphHeight; i++ {
+		yVal := minWPM + (maxWPM-minWPM)*float64(graphHeight-i)/float64(graphHeight)
+		b.WriteString(fmt.Sprintf("  %4.0f |", yVal))
+		b.WriteString(grid[i])
+		b.WriteString("\n")
+	}
 
-	// Calculate y positions for the line
-	yPositions := calculateYPositions(wpmValues, minWPM, maxWPM)
-
-	// Draw the line over the grid
-	drawLine(&b, yPositions, numPoints)
+	// Bottom axis
+	b.WriteString("       +")
+	b.WriteString(strings.Repeat("-", graphWidth))
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("       %s%s%s\n", "första", strings.Repeat(" ", graphWidth-12), "senaste"))
 
 	// Legend
 	b.WriteString(fmt.Sprintf("\n  %s Senaste: %.1f   %s Snitt: %.1f\n",
@@ -98,67 +108,60 @@ func addPadding(min, max float64) (float64, float64) {
 	return min, max
 }
 
-// drawGrid draws the background grid
-func drawGrid(b *strings.Builder, minWPM, maxWPM float64) {
-	for row := graphHeight; row >= 0; row-- {
-		yVal := minWPM + (maxWPM-minWPM)*float64(row)/float64(graphHeight)
-		b.WriteString(fmt.Sprintf("  %4.0f |", yVal))
+// positionPoints maps each value to a row in the grid (0 = lägst, graphHeight = högst)
+func positionPoints(values []float64, minWPM, maxWPM float64) []int {
+	positions := make([]int, len(values))
 
-		for x := 0; x < graphWidth; x++ {
-			b.WriteString(dimStyle.Render("·"))
+	for i, v := range values {
+		frac := 0.0
+		if maxWPM > minWPM {
+			frac = (v - minWPM) / (maxWPM - minWPM)
 		}
-		b.WriteString("\n")
-	}
-
-	// Bottom axis
-	b.WriteString("       +")
-	b.WriteString(strings.Repeat("-", graphWidth))
-	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("       %s%s%s\n", "första", strings.Repeat(" ", graphWidth-12), "senaste"))
-}
-
-// calculateYPositions converts WPM values to Y positions in the graph
-func calculateYPositions(values []float64, minWPM, maxWPM float64) []int {
-	numPoints := len(values)
-	positions := make([]int, numPoints)
-
-	for x := 0; x < numPoints && x < graphWidth; x++ {
-		yFloat := (values[x] - minWPM) / (maxWPM - minWPM) * float64(graphHeight)
-		pos := graphHeight - int(yFloat+0.5)
+		pos := int(frac*graphHeight + 0.5)
 		if pos < 0 {
 			pos = 0
 		}
 		if pos > graphHeight {
 			pos = graphHeight
 		}
-		positions[x] = pos
+		positions[i] = pos
 	}
 	return positions
 }
 
-// drawLine draws the WPM line over the grid
-func drawLine(b *strings.Builder, yPositions []int, numPoints int) {
-	b.WriteString("       |")
-	for x := 0; x < graphWidth && x < numPoints; x++ {
-		isPoint := isPeakOrValley(yPositions, x)
+// drawGrid renders the points and the line between them.
+// Returnerar en rad per grafhöjd, med den översta raden först.
+func drawGrid(positions []int) []string {
+	cells := make([][]rune, graphHeight+1)
+	for i := range cells {
+		cells[i] = []rune(strings.Repeat("·", graphWidth))
+	}
 
-		if isPoint {
-			b.WriteString(correctStyle.Render("█"))
-		} else {
-			b.WriteString(correctStyle.Render("▄"))
+	for x := 0; x < len(positions) && x < graphWidth; x++ {
+		row := positions[x]
+
+		// Rita den vertikala delen av linjen mellan föregående och aktuell punkt
+		if x > 0 {
+			prev := positions[x-1]
+			if prev != row {
+				step := 1
+				if prev > row {
+					step = -1
+				}
+				for r := prev + step; r != row; r += step {
+					cells[r][x-1] = '│'
+				}
+			}
 		}
-	}
-	b.WriteString("\n")
-}
 
-// isPeakOrValley determines if a point should be drawn as a full block
-func isPeakOrValley(positions []int, x int) bool {
-	if x <= 0 || x >= len(positions)-1 || x >= graphWidth-1 {
-		return true
+		cells[row][x] = '█'
 	}
-	prevY := positions[x-1]
-	nextY := positions[x+1]
-	return positions[x] != prevY && positions[x] != nextY
+
+	rows := make([]string, graphHeight+1)
+	for i := 0; i <= graphHeight; i++ {
+		rows[i] = string(cells[graphHeight-i])
+	}
+	return rows
 }
 
 // lastValue returns the last element or 0 if empty
