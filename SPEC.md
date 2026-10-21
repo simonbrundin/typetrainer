@@ -62,6 +62,9 @@ type Stats struct {
 - Analyzes user's weak bigrams (high error rate OR high avg time)
 - Generates word lists prioritizing these bigrams
 - Weights selection by difficulty score
+- Spreads the session across several weak bigrams (round-robin) instead of repeating one pattern
+- Limits inflections: max 1 word per word family (prata/pratar/pratade) and max 3 words per word ending
+- Never repeats the same word twice in a session
 - Shows current word highlight + next words preview
 
 ### 2. Practice Modes
