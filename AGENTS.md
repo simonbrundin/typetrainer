@@ -104,8 +104,9 @@ All Go-kod ligger i `src/go` (modul `typetrainer`). Entrypointen är
 
 ## Vad du inte ska göra
 
-- Ändra `wiki/index.md` eller `wiki/graph.md` för hand - de är genererade
-  av `wikictl index`.
+- Ändra `~/wiki/catalog.md` eller `~/wiki/graph.md` för hand - de är
+  genererade av `wikictl index`. `~/wiki/index.md` är kuraterad och
+  sköts för hand.
 - Ta bort en anteckning för att den känns gammal. Markera den som
   `status: deprecated` och skriv varför.
 - Skriva hemligheter i wikin, i commit-meddelanden eller i kod.
@@ -114,11 +115,12 @@ All Go-kod ligger i `src/go` (modul `typetrainer`). Entrypointen är
 
 ## Mer
 
-- `~/wiki/index.md` - alla anteckningar
-- `~/wiki/graph.md` - kunskapsgrafen
+- `~/wiki/index.md` - den kuraterade katalogen
+- `~/wiki/catalog.md` - alla sidor i wikin (genererad)
+- `~/wiki/graph.md` - kunskapsgrafen (genererad)
+- `~/wiki/AGENTS.md` - schemat: sidtyper, frontmatter, arbetsflöden
 - `SPEC.md` - designdokumentet (data modell, algoritm, konfiguration).
   **Delvis inaktuellt** - koden har den sista ordningen.
-- `wiki/README.md` - hur wikin fungerar i detalj
 
 ## Andra repon
 
