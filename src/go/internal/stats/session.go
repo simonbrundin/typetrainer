@@ -142,6 +142,12 @@ func (s *Stats) Reset() {
 	s.PersonalBest = make(map[string]float64)
 }
 
+// ResetSessions rensar sessionshistoriken men behåller bigram-statistiken
+func (s *Stats) ResetSessions() {
+	s.Sessions = make([]SessionSummary, 0)
+	s.PersonalBest = make(map[string]float64)
+}
+
 // WeakBigrams returns bigrams that need practice
 func (s *Stats) WeakBigrams(wl *wordlist.WordList, cfg *bigram.Config) []string {
 	avgTime := s.Bigrams.GlobalAvgTime()

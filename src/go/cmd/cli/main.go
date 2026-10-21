@@ -20,7 +20,7 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use:   "typetrainer",
 		Short: "Swedish typing trainer with adaptive bigram practice",
-		Long:  `A CLI typing trainer that adapts to your weaknesses by tracking and prioritizing
+		Long: `A CLI typing trainer that adapts to your weaknesses by tracking and prioritizing
 practice on difficult two-letter combinations (bigrams).`,
 	}
 
@@ -71,7 +71,14 @@ practice on difficult two-letter combinations (bigrams).`,
 		Run:   runReset,
 	}
 
-	rootCmd.AddCommand(adaptiveCmd, randomCmd, sprintCmd, practiceCmd, statsCmd, resetCmd)
+	// Reset sessions only (keeps bigram statistics)
+	resetSessionsCmd := &cobra.Command{
+		Use:   "reset-sessions",
+		Short: "Reset session history but keep bigram statistics",
+		Run:   runResetSessions,
+	}
+
+	rootCmd.AddCommand(adaptiveCmd, randomCmd, sprintCmd, practiceCmd, statsCmd, resetCmd, resetSessionsCmd)
 
 	// Default to adaptive if no subcommand
 	if len(os.Args) == 1 {
@@ -129,7 +136,7 @@ func runPractice(cmd *cobra.Command, args []string) {
 	wl := wordlist.New()
 	s := stats.Load()
 
-	words := wl.WordsWithBigram(bigram)
+	words := wl.PracticeWords(bigram, 1)
 
 	session.RunSession(words, wl, s, cfg, session.ModePracticeBigram)
 }
@@ -151,6 +158,23 @@ func runReset(cmd *cobra.Command, args []string) {
 		s.Reset()
 		s.Save()
 		fmt.Println("✅ Statistiken har nollställts.")
+	} else {
+		fmt.Println("Avbröt.")
+	}
+}
+
+func runResetSessions(cmd *cobra.Command, args []string) {
+	fmt.Println("⚠️  Vill du nollställa sessionshistoriken (bigram-statistiken behålls)?")
+	fmt.Print("   Skriv 'ja' för att bekräfta: ")
+
+	var input string
+	fmt.Scanln(&input)
+
+	if input == "ja" {
+		s := stats.Load()
+		s.ResetSessions()
+		s.Save()
+		fmt.Println("✅ Sessionshistoriken har nollställts.")
 	} else {
 		fmt.Println("Avbröt.")
 	}
