@@ -25,11 +25,11 @@ func (s *Stats) PrintStats() {
 	fmt.Printf("║  Total träningstid:      %12ds     ║\n", totalTime/1000)
 	fmt.Println("║                                          ║")
 
-	// Average WPM
-	avgWPM := s.AvgWPM(10)
-	avgRawWPM := s.AvgRawWPM(10)
-	fmt.Printf("║  Snitt Raw WPM (10):     %12.1f     ║\n", avgRawWPM)
-	fmt.Printf("║  Snitt WPM (10):         %12.1f     ║\n", avgWPM)
+	// Median WPM over the last 30 sessions
+	medianWPM := s.MedianWPM(30)
+	medianRawWPM := s.MedianRawWPM(30)
+	fmt.Printf("║  Median Raw WPM (30):    %12.1f     ║\n", medianRawWPM)
+	fmt.Printf("║  Median WPM (30):        %12.1f     ║\n", medianWPM)
 
 	// Personal best
 	if pb, ok := s.PersonalBest["default"]; ok && pb > 0 {

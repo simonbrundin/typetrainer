@@ -98,6 +98,57 @@ func (s *Stats) AvgWPM(n int) float64 {
 	return sum / float64(len(recent))
 }
 
+// MedianWPM calculates the median WPM over the last n sessions
+func (s *Stats) MedianWPM(n int) float64 {
+	return Median(wpmValues(s.RecentSessions(n)))
+}
+
+// MedianRawWPM calculates the median Raw WPM over the last n sessions
+func (s *Stats) MedianRawWPM(n int) float64 {
+	recent := s.RecentSessions(n)
+	values := make([]float64, 0, len(recent))
+	for _, sess := range recent {
+		values = append(values, sess.RawWPM)
+	}
+	return Median(values)
+}
+
+// MedianScore calculates the median score (WPM * accuracy) over the last n sessions
+func (s *Stats) MedianScore(n int) float64 {
+	recent := s.RecentSessions(n)
+	values := make([]float64, 0, len(recent))
+	for _, sess := range recent {
+		values = append(values, sess.Score())
+	}
+	return Median(values)
+}
+
+// Median returns the median of a slice of values
+func Median(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	sorted := make([]float64, len(values))
+	copy(sorted, values)
+	sort.Float64s(sorted)
+
+	mid := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[mid]
+	}
+	return (sorted[mid-1] + sorted[mid]) / 2
+}
+
+// wpmValues extracts the WPM values from a list of sessions
+func wpmValues(sessions []SessionSummary) []float64 {
+	values := make([]float64, 0, len(sessions))
+	for _, sess := range sessions {
+		values = append(values, sess.WPM)
+	}
+	return values
+}
+
 // AvgRawWPM calculates average Raw WPM over last n sessions
 func (s *Stats) AvgRawWPM(n int) float64 {
 	recent := s.RecentSessions(n)

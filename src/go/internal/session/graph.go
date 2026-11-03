@@ -28,7 +28,7 @@ func renderGraph(sessions []stats.SessionSummary) string {
 
 	// Extract WPM values
 	wpmValues := extractWPMValues(sessions, startIdx, numPoints)
-	avgWPM := calculateAverage(wpmValues)
+	medianWPM := stats.Median(wpmValues)
 	minWPM, maxWPM := findMinMax(wpmValues)
 	minWPM, maxWPM = addPadding(minWPM, maxWPM)
 
@@ -39,7 +39,7 @@ func renderGraph(sessions []stats.SessionSummary) string {
 	var b strings.Builder
 
 	// Header
-	b.WriteString(fmt.Sprintf("  WPM-utveckling (senaste %d) - Snitt: %.1f\n\n", numPoints, avgWPM))
+	b.WriteString(fmt.Sprintf("  WPM-utveckling (senaste %d) - Median: %.1f\n\n", numPoints, medianWPM))
 
 	// Rita rader med etikett (överst = högst värde)
 	for i := 0; i <= graphHeight; i++ {
@@ -56,9 +56,9 @@ func renderGraph(sessions []stats.SessionSummary) string {
 	b.WriteString(fmt.Sprintf("       %s%s%s\n", "första", strings.Repeat(" ", graphWidth-12), "senaste"))
 
 	// Legend
-	b.WriteString(fmt.Sprintf("\n  %s Senaste: %.1f   %s Snitt: %.1f\n",
+	b.WriteString(fmt.Sprintf("\n  %s Senaste: %.1f   %s Median: %.1f\n",
 		correctStyle.Render("█"), lastValue(wpmValues),
-		dimStyle.Render("---"), avgWPM))
+		dimStyle.Render("---"), medianWPM))
 
 	return b.String()
 }
@@ -70,15 +70,6 @@ func extractWPMValues(sessions []stats.SessionSummary, startIdx, numPoints int) 
 		values[i] = sessions[startIdx+i].WPM
 	}
 	return values
-}
-
-// calculateAverage computes the average of a slice
-func calculateAverage(values []float64) float64 {
-	var sum float64
-	for _, v := range values {
-		sum += v
-	}
-	return sum / float64(len(values))
 }
 
 // findMinMax finds the minimum and maximum values
