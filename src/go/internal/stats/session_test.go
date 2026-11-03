@@ -7,9 +7,9 @@ import (
 
 func TestSessionSummary_Accuracy(t *testing.T) {
 	tests := []struct {
-		name     string
-		summary  SessionSummary
-		wantAcc  float64
+		name    string
+		summary SessionSummary
+		wantAcc float64
 	}{
 		{
 			name:    "zero words",
@@ -153,9 +153,9 @@ func TestStats_AvgWPM(t *testing.T) {
 		n    int
 		want float64
 	}{
-		{1, 90},              // Last one
-		{3, 80},              // (90+80+70)/3 = 80
-		{10, 70},             // All 5, sum/5
+		{1, 90},  // Last one
+		{3, 80},  // (90+80+70)/3 = 80
+		{10, 70}, // All 5, sum/5
 	}
 
 	for _, tt := range tests {
@@ -240,5 +240,75 @@ func TestStats_Reset(t *testing.T) {
 	}
 	if len(s.PersonalBest) != 0 {
 		t.Errorf("After Reset, len(PersonalBest) = %d, want 0", len(s.PersonalBest))
+	}
+}
+
+func TestMedian(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []float64
+		want   float64
+	}{
+		{"empty", nil, 0},
+		{"one", []float64{10}, 10},
+		{"odd", []float64{3, 1, 2}, 2},
+		{"even", []float64{4, 1, 3, 2}, 2.5},
+		{"unsorted", []float64{10, 2, 8, 4}, 6},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Median(tt.values); got != tt.want {
+				t.Errorf("Median(%v) = %.2f, want %.2f", tt.values, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMedian_DoesNotModifyInput(t *testing.T) {
+	values := []float64{3, 1, 2}
+	Median(values)
+
+	if values[0] != 3 {
+		t.Errorf("input was modified: %v", values)
+	}
+}
+
+func TestStats_MedianWPM(t *testing.T) {
+	s := New()
+	for _, wpm := range []float64{10, 20, 30, 40, 100} {
+		s.AddSession(SessionSummary{WPM: wpm})
+	}
+
+	// Median av alla fem = 30
+	if got := s.MedianWPM(30); got != 30 {
+		t.Errorf("MedianWPM(30) = %.1f, want 30", got)
+	}
+
+	// Bara de två senaste: 40 och 100 -> 70
+	if got := s.MedianWPM(2); got != 70 {
+		t.Errorf("MedianWPM(2) = %.1f, want 70", got)
+	}
+}
+
+func TestStats_MedianRawWPM(t *testing.T) {
+	s := New()
+	for _, raw := range []float64{5, 15, 25} {
+		s.AddSession(SessionSummary{RawWPM: raw})
+	}
+
+	if got := s.MedianRawWPM(30); got != 15 {
+		t.Errorf("MedianRawWPM(30) = %.1f, want 15", got)
+	}
+}
+
+func TestStats_MedianScore(t *testing.T) {
+	s := New()
+	s.AddSession(SessionSummary{WPM: 100, WordsCompleted: 10})
+	s.AddSession(SessionSummary{WPM: 50, WordsCompleted: 10})
+
+	// Båda har accuracy 100% -> score 100 resp 50 -> median 75
+	if got := s.MedianScore(30); got != 75 {
+		t.Errorf("MedianScore(30) = %.1f, want 75", got)
 	}
 }
