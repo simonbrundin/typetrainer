@@ -16,6 +16,12 @@ var (
 	bigramFlag   string
 )
 
+// Bygginformation sätts in via -ldflags vid bygget
+var (
+	version   = "dev"
+	buildTime = "unknown"
+)
+
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "typetrainer",
@@ -78,7 +84,14 @@ practice on difficult two-letter combinations (bigrams).`,
 		Run:   runResetSessions,
 	}
 
-	rootCmd.AddCommand(adaptiveCmd, randomCmd, sprintCmd, practiceCmd, statsCmd, resetCmd, resetSessionsCmd)
+	// Version
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show version and build time",
+		Run:   runVersion,
+	}
+
+	rootCmd.AddCommand(adaptiveCmd, randomCmd, sprintCmd, practiceCmd, statsCmd, resetCmd, resetSessionsCmd, versionCmd)
 
 	// Default to adaptive if no subcommand
 	if len(os.Args) == 1 {
@@ -178,4 +191,8 @@ func runResetSessions(cmd *cobra.Command, args []string) {
 	} else {
 		fmt.Println("Avbröt.")
 	}
+}
+
+func runVersion(cmd *cobra.Command, args []string) {
+	fmt.Printf("typetrainer %s (byggd %s)\n", version, buildTime)
 }
